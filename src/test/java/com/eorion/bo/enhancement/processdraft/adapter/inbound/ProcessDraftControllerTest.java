@@ -11,6 +11,7 @@ import org.camunda.bpm.engine.IdentityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -19,7 +20,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -37,7 +37,9 @@ public class ProcessDraftControllerTest {
         headers.set("Authorization", "Basic " + Base64.getEncoder().encodeToString("demo:demo".getBytes(StandardCharsets.UTF_8)));
     }
 
-    private final InputStreamReader applicationDraftDeleteReader = new InputStreamReader(Objects.requireNonNull(this.getClass().getClassLoader().getResourceAsStream("sql/delete-all.sql")));
+    @Value("${spring.profiles.active:default}") // "default" if no profile is set
+    private String activeProfile;
+
     private final ObjectMapper mapper = new ObjectMapper();
     @Autowired
     private ProcessDraftRepository repository;
@@ -48,9 +50,16 @@ public class ProcessDraftControllerTest {
     @Autowired
     private BatchSQLExecutor executor;
 
+    private InputStreamReader getApplicationDraftDeleteReader() {
+        if (activeProfile.equals("testcontainers")) {
+            return new InputStreamReader(Objects.requireNonNull(this.getClass().getClassLoader().getResourceAsStream("sql/delete-all.oracle.sql")));
+        }
+        return new InputStreamReader(Objects.requireNonNull(this.getClass().getClassLoader().getResourceAsStream("sql/delete-all.sql")));
+    }
+
     @BeforeEach
-    public void clearUp() throws SQLException, IOException {
-        executor.batchExecuteSqlFromFile(applicationDraftDeleteReader);
+    public void clearUp() throws SQLException {
+        executor.batchExecuteSqlFromFile(getApplicationDraftDeleteReader());
         identityService.setAuthenticatedUserId("demo");
     }
 
@@ -60,18 +69,19 @@ public class ProcessDraftControllerTest {
                         MockMvcRequestBuilders.post("/enhancement/draft")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .headers(headers)
-                                .content("{\n" +
-                                        "\"tenant\": \"tenant\",\n" +
-                                        "\"resourceType\": \"1\",\n" +
-                                        "\"userId\": \"userId\",\n" +
-                                        "\"processDefinitionKey\": \"processDefinitionKey\",\n" +
-                                        "\"processDefinitionName\": \"processDefinitionName\",\n" +
-                                        "\"taskDefinitionKey\": \"ewrewr\",\n" +
-                                        "\"taskDefinitionName\": null,\n" +
-                                        "\"taskInstanceId\": \"ewrewr32ed23\",\n" +
-                                        "\"type\": \"1\",\n" +
-                                        "\"formDraft\": {\"key\": \"value\"}\n" +
-                                        "}")
+                                .content("""
+                                        {
+                                        "tenant": "tenant",
+                                        "resourceType": "1",
+                                        "userId": "userId",
+                                        "processDefinitionKey": "processDefinitionKey",
+                                        "processDefinitionName": "processDefinitionName",
+                                        "taskDefinitionKey": "ewrewr",
+                                        "taskDefinitionName": null,
+                                        "taskInstanceId": "ewrewr32ed23",
+                                        "type": "1",
+                                        "formDraft": {"key": "value"}
+                                        }""")
                 )
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(1));
@@ -96,17 +106,18 @@ public class ProcessDraftControllerTest {
                         MockMvcRequestBuilders.put("/enhancement/draft/{id}", draft.getId())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .headers(headers)
-                                .content("{\n" +
-                                        "  \"tenant\": \"tenant2\",\n" +
-                                        "  \"resourceType\": \"2\",\n" +
-                                        "  \"processDefinitionKey\": \"processDefinitionKey2\",\n" +
-                                        "  \"processDefinitionName\": \"processDefinitionName2\",\n" +
-                                        "  \"taskDefinitionKey\": \"ewrewrffffff\",\n" +
-                                        "  \"taskDefinitionName\": \"taskDefinitionName2\",\n" +
-                                        "  \"taskInstanceId\": \"ewrewr32ed23dddd\",\n" +
-                                        "  \"type\": \"2\",\n" +
-                                        "\"formDraft\": {\"key\": \"value\"}\n" +
-                                        "}")
+                                .content("""
+                                        {
+                                          "tenant": "tenant2",
+                                          "resourceType": "2",
+                                          "processDefinitionKey": "processDefinitionKey2",
+                                          "processDefinitionName": "processDefinitionName2",
+                                          "taskDefinitionKey": "ewrewrffffff",
+                                          "taskDefinitionName": "taskDefinitionName2",
+                                          "taskInstanceId": "ewrewr32ed23dddd",
+                                          "type": "2",
+                                        "formDraft": {"key": "value"}
+                                        }""")
                 )
                 .andExpect(MockMvcResultMatchers.status().isNoContent());
     }
