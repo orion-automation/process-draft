@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.eorion.bo.enhancement</groupId>
     <artifactId>process-draft</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <name>process draft features</name>
     <description>A spring boot starter of process draft features for Camunda Platform 7</description>
     <url/>
